@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAN File Transfer - Share files across your local network</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #333; background: #f8f9fb; line-height: 1.6;
+  }
+
+  /* Language switch */
+  .lang-switch {
+    position: fixed; top: 16px; right: 20px; z-index: 100;
+    display: flex; gap: 4px; background: #fff; border-radius: 8px;
+    padding: 3px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  }
+  .lang-btn {
+    padding: 5px 12px; border: none; border-radius: 6px; font-size: 13px;
+    cursor: pointer; background: transparent; color: #666; transition: all 0.15s;
+  }
+  .lang-btn.active { background: #4361ee; color: #fff; }
+  .lang-btn:hover:not(.active) { background: #f0f2f5; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff; text-align: center; padding: 100px 20px 80px; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at 30% 40%, rgba(67,97,238,0.15) 0%, transparent 60%),
+                radial-gradient(circle at 70% 60%, rgba(114,9,183,0.1) 0%, transparent 50%);
+  }
+  .hero > * { position: relative; }
+  .hero-icon { font-size: 64px; margin-bottom: 20px; }
+  .hero h1 { font-size: 42px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.5px; }
+  .hero p { font-size: 18px; color: rgba(255,255,255,0.75); max-width: 550px; margin: 0 auto 32px; }
+  .hero-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .hero-btn {
+    padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 600;
+    text-decoration: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .hero-btn.primary { background: #4361ee; color: #fff; }
+  .hero-btn.primary:hover { background: #3a56d4; transform: translateY(-1px); }
+  .hero-btn.secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+  .hero-btn.secondary:hover { background: rgba(255,255,255,0.18); }
+
+  /* Section */
+  .section { padding: 80px 20px; max-width: 1000px; margin: 0 auto; }
+  .section-title { font-size: 30px; font-weight: 700; text-align: center; margin-bottom: 12px; color: #1a1a2e; }
+  .section-sub { font-size: 16px; color: #666; text-align: center; margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+  /* Features */
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .feature {
+    background: #fff; border-radius: 14px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .feature:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  .feature-icon { font-size: 36px; margin-bottom: 14px; }
+  .feature h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; color: #1a1a2e; }
+  .feature p { font-size: 14px; color: #666; line-height: 1.5; }
+
+  /* Demo mockup */
+  .demo-section { background: #fff; }
+  .demo-card {
+    max-width: 720px; margin: 0 auto; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1); border: 1px solid #eee;
+  }
+  .demo-bar {
+    background: #f5f5f5; padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+  .demo-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .demo-dot.r { background: #ff5f57; }
+  .demo-dot.y { background: #febc2e; }
+  .demo-dot.g { background: #28c840; }
+  .demo-url {
+    margin-left: 12px; background: #fff; border-radius: 6px; padding: 4px 14px;
+    font-size: 13px; color: #888; font-family: monospace; flex: 1;
+  }
+  .demo-body { padding: 32px 28px; background: #f0f2f5; }
+  .demo-upload {
+    border: 2px dashed #c5cae9; border-radius: 12px; padding: 28px 16px;
+    text-align: center; background: #fff; margin-bottom: 16px;
+  }
+  .demo-upload-icon { font-size: 32px; margin-bottom: 8px; color: #4361ee; }
+  .demo-upload h4 { font-size: 15px; color: #333; margin-bottom: 4px; }
+  .demo-upload p { font-size: 12px; color: #999; }
+  .demo-file-list { background: #fff; border-radius: 10px; overflow: hidden; }
+  .demo-file-header {
+    padding: 10px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid #eee;
+    display: flex; justify-content: space-between;
+  }
+  .demo-file-header span { color: #888; font-weight: 400; }
+  .demo-file-item {
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #f5f5f5; font-size: 13px;
+  }
+  .demo-file-item:last-child { border-bottom: none; }
+  .demo-file-item .icon { font-size: 20px; }
+  .demo-file-item .name { flex: 1; font-weight: 500; }
+  .demo-file-item .size { color: #999; font-size: 12px; }
+  .demo-file-item .dl {
+    background: #4361ee; color: #fff; border: none; border-radius: 6px;
+    padding: 4px 10px; font-size: 11px; font-weight: 500;
+  }
+
+  /* Quick start */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+  .step {
+    text-align: center; padding: 24px;
+    background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: 50%; background: #4361ee;
+    color: #fff; font-size: 18px; font-weight: 700; margin-bottom: 14px;
+  }
+  .step h3 { font-size: 16px; margin-bottom: 6px; color: #1a1a2e; }
+  .step p { font-size: 13px; color: #666; }
+
+  /* Code block */
+  .code-section { text-align: center; }
+  .code-block {
+    display: inline-block; background: #1a1a2e; color: #e0e0e0; padding: 20px 32px;
+    border-radius: 12px; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 15px; text-align: left; margin-top: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  .code-block .comment { color: #666; }
+  .code-block .cmd { color: #7ec8e3; }
+
+  /* Footer */
+  footer {
+    text-align: center; padding: 40px 20px; color: #999; font-size: 13px;
+    border-top: 1px solid #eee; margin-top: 40px;
+  }
+  footer a { color: #4361ee; text-decoration: none; }
+
+  @media (max-width: 600px) {
+    .hero { padding: 70px 16px 50px; }
+    .hero h1 { font-size: 28px; }
+    .hero p { font-size: 15px; }
+    .section { padding: 50px 16px; }
+    .section-title { font-size: 24px; }
+    .demo-body { padding: 16px 12px; }
+    .lang-switch { top: 10px; right: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch">
+  <button class="lang-btn active" onclick="setLang('en')" id="lbEn">EN</button>
+  <button class="lang-btn" onclick="setLang('zh')" id="lbZh">中文</button>
+</div>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-icon">📡</div>
+  <h1 data-i18n="heroTitle">LAN File Transfer</h1>
+  <p data-i18n="heroSub">A lightweight web-based tool for sharing files and folders between devices on the same local network. No signup, no cloud, no limits.</p>
+  <div class="hero-buttons">
+    <a class="hero-btn primary" href="https://github.com/duanery/lan-transfer" target="_blank">
+      ⭐ <span data-i18n="heroBtn1">GitHub</span>
+    </a>
+    <a class="hero-btn secondary" href="#quickstart">
+      🚀 <span data-i18n="heroBtn2">Quick Start</span>
+    </a>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section">
+  <h2 class="section-title" data-i18n="featTitle">Features</h2>
+  <p class="section-sub" data-i18n="featSub">Everything you need for fast local file sharing, nothing you don't.</p>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">📂</div>
+      <h3 data-i18n="f1t">Folder Upload</h3>
+      <p data-i18n="f1d">Upload entire folders while preserving directory structure. Supports drag-and-drop and file picker.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🗂️</div>
+      <h3 data-i18n="f2t">Directory Browsing</h3>
+      <p data-i18n="f2d">Navigate into folders, browse contents, and download individual files with breadcrumb navigation.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📱</div>
+      <h3 data-i18n="f3t">QR Code Access</h3>
+      <p data-i18n="f3d">Instantly generate a QR code for the server URL. Scan with your phone to start transferring.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🌍</div>
+      <h3 data-i18n="f4t">Multi-language</h3>
+      <p data-i18n="f4d">Supports English and Chinese with automatic browser language detection and manual switching.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <h3 data-i18n="f5t">Upload Progress</h3>
+      <p data-i18n="f5d">Real-time progress bar with percentage display during file uploads. Supports files up to 5GB.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <h3 data-i18n="f6t">Zero Configuration</h3>
+      <p data-i18n="f6d">Just run one command. No database, no config files, no external services. Pure LAN speed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Demo -->
+<section class="section demo-section">
+  <h2 class="section-title" data-i18n="demoTitle">Interface Preview</h2>
+  <p class="section-sub" data-i18n="demoSub">A clean, responsive web interface that works on any device.</p>
+  <div class="demo-card">
+    <div class="demo-bar">
+      <div class="demo-dot r"></div>
+      <div class="demo-dot y"></div>
+      <div class="demo-dot g"></div>
+      <div class="demo-url">http://192.168.1.100:3000</div>
+    </div>
+    <div class="demo-body">
+      <div class="demo-upload">
+        <div class="demo-upload-icon">⬆️</div>
+        <h4 data-i18n="demoDropTitle">Drag and drop files or folders here</h4>
+        <p data-i18n="demoDropHint">Files will be uploaded to the current directory</p>
+      </div>
+      <div class="demo-file-list">
+        <div class="demo-file-header">
+          <span data-i18n="demoFileList">File List</span>
+          <span>5 items</span>
+        </div>
+        <div class="demo-file-item">
+          <span class="icon">📂</span>
+          <span class="name" style="color:#4361ee;">photos/</span>
+          <span class="size">12 files · 48.2 MB</span>
+        </div>
+        <div class="demo-file-item">
+          <span class="icon">📄</span>
+          <span class="name">report.pdf</span>
+          <span class="size">2.3 MB</span>
+          <button class="dl" data-i18n="demoDownload">Download</button>
+        </div>
+        <div class="demo-file-item">
+          <span class="icon">📦</span>
+          <span class="name">project.zip</span>
+          <span class="size">156.7 MB</span>
+          <button class="dl" data-i18n="demoDownload2">Download</button>
+        </div>
+        <div class="demo-file-item">
+          <span class="icon">🎬</span>
+          <span class="name">demo-video.mp4</span>
+          <span class="size">1.2 GB</span>
+          <button class="dl" data-i18n="demoDownload3">Download</button>
+        </div>
+        <div class="demo-file-item">
+          <span class="icon">🖼️</span>
+          <span class="name">screenshot.png</span>
+          <span class="size">843.0 KB</span>
+          <button class="dl" data-i18n="demoDownload4">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Start -->
+<section class="section" id="quickstart">
+  <h2 class="section-title" data-i18n="qsTitle">Quick Start</h2>
+  <p class="section-sub" data-i18n="qsSub">Up and running in under a minute.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3 data-i18n="s1t">Clone & Install</h3>
+      <p data-i18n="s1d">Clone the repository and install Node.js dependencies.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3 data-i18n="s2t">Start Server</h3>
+      <p data-i18n="s2d">Run the server. Optionally specify a custom directory.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3 data-i18n="s3t">Open & Share</h3>
+      <p data-i18n="s3d">Open the LAN address in any browser on the same network.</p>
+    </div>
+  </div>
+
+  <div class="code-section" style="margin-top: 36px;">
+    <div class="code-block">
+      <div><span class="comment"># Clone the repo</span></div>
+      <div><span class="cmd">git clone</span> https://github.com/duanery/lan-transfer.git</div>
+      <div><span class="cmd">cd</span> lan-transfer</div>
+      <br>
+      <div><span class="comment"># Install dependencies</span></div>
+      <div><span class="cmd">npm install</span></div>
+      <br>
+      <div><span class="comment"># Start the server</span></div>
+      <div><span class="cmd">node</span> server.js</div>
+      <br>
+      <div><span class="comment"># Or specify a custom directory</span></div>
+      <div><span class="cmd">node</span> server.js ~/shared-files</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>Made with ❤️ &mdash; <a href="https://github.com/duanery/lan-transfer" target="_blank">GitHub</a></p>
+</footer>
+
+<script>
+const I18N = {
+  en: {
+    heroTitle: 'LAN File Transfer',
+    heroSub: 'A lightweight web-based tool for sharing files and folders between devices on the same local network. No signup, no cloud, no limits.',
+    heroBtn1: 'GitHub', heroBtn2: 'Quick Start',
+    featTitle: 'Features',
+    featSub: 'Everything you need for fast local file sharing, nothing you don\'t.',
+    f1t: 'Folder Upload', f1d: 'Upload entire folders while preserving directory structure. Supports drag-and-drop and file picker.',
+    f2t: 'Directory Browsing', f2d: 'Navigate into folders, browse contents, and download individual files with breadcrumb navigation.',
+    f3t: 'QR Code Access', f3d: 'Instantly generate a QR code for the server URL. Scan with your phone to start transferring.',
+    f4t: 'Multi-language', f4d: 'Supports English and Chinese with automatic browser language detection and manual switching.',
+    f5t: 'Upload Progress', f5d: 'Real-time progress bar with percentage display during file uploads. Supports files up to 5GB.',
+    f6t: 'Zero Configuration', f6d: 'Just run one command. No database, no config files, no external services. Pure LAN speed.',
+    demoTitle: 'Interface Preview', demoSub: 'A clean, responsive web interface that works on any device.',
+    demoDropTitle: 'Drag and drop files or folders here', demoDropHint: 'Files will be uploaded to the current directory',
+    demoFileList: 'File List',
+    demoDownload: 'Download', demoDownload2: 'Download', demoDownload3: 'Download', demoDownload4: 'Download',
+    qsTitle: 'Quick Start', qsSub: 'Up and running in under a minute.',
+    s1t: 'Clone & Install', s1d: 'Clone the repository and install Node.js dependencies.',
+    s2t: 'Start Server', s2d: 'Run the server. Optionally specify a custom directory.',
+    s3t: 'Open & Share', s3d: 'Open the LAN address in any browser on the same network.',
+  },
+  zh: {
+    heroTitle: 'LAN File Transfer',
+    heroSub: '轻量级局域网文件传输工具，在同一网络的设备之间快速共享文件和文件夹。无需注册，无需云端，无限制。',
+    heroBtn1: 'GitHub', heroBtn2: '快速开始',
+    featTitle: '功能特性',
+    featSub: '局域网文件共享所需的一切，简洁高效。',
+    f1t: '文件夹上传', f1d: '上传整个文件夹并保留目录结构，支持拖拽和文件选择器。',
+    f2t: '目录浏览', f2d: '进入文件夹浏览内容，下载单个文件，面包屑导航快速跳转。',
+    f3t: '二维码访问', f3d: '自动生成服务器地址二维码，手机扫一扫即可开始传输。',
+    f4t: '多语言支持', f4d: '支持中文和英文，自动检测浏览器语言，可手动切换。',
+    f5t: '上传进度', f5d: '实时进度条和百分比显示，单文件最大支持 5GB。',
+    f6t: '零配置', f6d: '一条命令启动，无需数据库、配置文件或外部服务，纯局域网速度。',
+    demoTitle: '界面预览', demoSub: '简洁响应式界面，适配任何设备。',
+    demoDropTitle: '拖拽文件或文件夹到此处上传', demoDropHint: '上传到当前浏览的目录',
+    demoFileList: '文件列表',
+    demoDownload: '下载', demoDownload2: '下载', demoDownload3: '下载', demoDownload4: '下载',
+    qsTitle: '快速开始', qsSub: '一分钟内即可启动运行。',
+    s1t: '克隆 & 安装', s1d: '克隆仓库并安装 Node.js 依赖。',
+    s2t: '启动服务器', s2d: '运行服务器，可选指定自定义目录。',
+    s3t: '打开 & 共享', s3d: '在同一网络的任意设备浏览器中打开 LAN 地址。',
+  }
+};
+
+let lang = (navigator.language || '').startsWith('zh') ? 'zh' : 'en';
+const saved = localStorage.getItem('lan-transfer-page-lang');
+if (saved && I18N[saved]) lang = saved;
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (I18N[lang][k] !== undefined) el.textContent = I18N[lang][k];
+  });
+  document.getElementById('lbEn').classList.toggle('active', lang === 'en');
+  document.getElementById('lbZh').classList.toggle('active', lang === 'zh');
+}
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('lan-transfer-page-lang', l);
+  applyLang();
+}
+
+applyLang();
+</script>
+</body>
+</html>
