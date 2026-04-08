@@ -5,21 +5,17 @@ const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
 
-
 const app = express();
 const PORT = 3000;
 
-// Support custom upload directory via command line argument
 const UPLOAD_DIR = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, 'uploads');
 
-// Ensure uploads directory exists
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 app.use(express.json());
 
-// Sanitize path to prevent directory traversal
 function safePath(relativePath) {
   const cleaned = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
   const resolved = path.resolve(UPLOAD_DIR, cleaned);
@@ -27,7 +23,6 @@ function safePath(relativePath) {
   return resolved;
 }
 
-// Multer config - upload to temp dir first, then move based on paths
 const TEMP_DIR = path.join(__dirname, '.tmp_uploads');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
@@ -84,7 +79,7 @@ function getDirFileCount(dirPath) {
   return count;
 }
 
-// API: list files in a directory
+// API: list files
 app.get('/api/files', (req, res) => {
   try {
     const relDir = req.query.dir || '';
@@ -116,10 +111,9 @@ app.get('/api/files', (req, res) => {
   }
 });
 
-// API: upload - move files from temp to correct paths
+// API: upload
 app.post('/api/upload', upload.array('files', 500), (req, res) => {
   try {
-    // paths[] contains the relative path for each file (sent from frontend)
     let paths = req.body.paths;
     if (!paths) paths = [];
     if (typeof paths === 'string') paths = [paths];
@@ -133,7 +127,6 @@ app.post('/api/upload', upload.array('files', 500), (req, res) => {
       const relativePath = paths[i] || req.files[i].originalname;
       const destPath = path.join(destBase, relativePath);
 
-      // Security check
       if (!destPath.startsWith(UPLOAD_DIR)) {
         fs.unlinkSync(tempPath);
         continue;
@@ -148,7 +141,7 @@ app.post('/api/upload', upload.array('files', 500), (req, res) => {
   }
 });
 
-// API: download file
+// API: download
 app.get('/api/download/*', (req, res) => {
   const relPath = req.params[0];
   const filePath = safePath(relPath);
@@ -162,7 +155,7 @@ app.get('/api/download/*', (req, res) => {
   res.download(filePath, path.basename(filePath));
 });
 
-// API: delete file or directory
+// API: delete
 app.delete('/api/files/*', (req, res) => {
   const relPath = req.params[0];
   const filePath = safePath(relPath);
@@ -178,7 +171,7 @@ app.delete('/api/files/*', (req, res) => {
   res.json({ success: true });
 });
 
-// API: create directory
+// API: mkdir
 app.post('/api/mkdir', (req, res) => {
   const { dir, name } = req.body;
   const parentDir = dir ? safePath(dir) : UPLOAD_DIR;
@@ -203,7 +196,7 @@ app.get('/', (req, res) => {
 
 function getHTML() {
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -218,6 +211,18 @@ function getHTML() {
   header { text-align: center; padding: 24px 0 16px; }
   header h1 { font-size: 26px; color: #1a1a2e; margin-bottom: 6px; }
   header p { color: #666; font-size: 14px; }
+
+  .lang-switch {
+    position: absolute; top: 16px; right: 20px;
+    display: flex; gap: 4px; background: #fff; border-radius: 8px;
+    padding: 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .lang-btn {
+    padding: 5px 12px; border: none; border-radius: 6px; font-size: 13px;
+    cursor: pointer; background: transparent; color: #666; transition: all 0.15s;
+  }
+  .lang-btn.active { background: #4361ee; color: #fff; }
+  .lang-btn:hover:not(.active) { background: #f0f2f5; }
 
   .info-bar {
     display: flex; align-items: center; justify-content: center; gap: 20px;
@@ -316,22 +321,28 @@ function getHTML() {
     .upload-zone { padding: 24px 14px; }
     .file-actions { flex-direction: column; gap: 3px; }
     .btn { padding: 5px 8px; font-size: 11px; }
+    .lang-switch { top: 10px; right: 10px; }
   }
 </style>
 </head>
 <body>
+<div class="lang-switch">
+  <button class="lang-btn" onclick="setLang('en')" id="langBtnEn">EN</button>
+  <button class="lang-btn" onclick="setLang('zh')" id="langBtnZh">中文</button>
+</div>
+
 <div class="container">
   <header>
-    <h1>LAN File Transfer</h1>
-    <p>在局域网内的设备之间快速传输文件和文件夹</p>
+    <h1 data-i18n="title">LAN File Transfer</h1>
+    <p data-i18n="subtitle">Transfer files and folders between devices on the same network</p>
   </header>
 
   <div class="info-bar">
     <div>
-      <span style="color:#888;font-size:13px;">访问地址：</span>
+      <span style="color:#888;font-size:13px;" data-i18n="address">Address: </span>
       <span class="url" id="serverUrl">loading...</span>
       <br>
-      <span class="qr-toggle" onclick="toggleQR()">显示二维码</span>
+      <span class="qr-toggle" onclick="toggleQR()" data-i18n="showQR">Show QR Code</span>
       <div class="qr-img" id="qrBox"><img id="qrImg" src="" alt="QR"></div>
     </div>
   </div>
@@ -341,11 +352,11 @@ function getHTML() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
       <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
     </svg>
-    <h3>拖拽文件或文件夹到此处上传</h3>
-    <p>上传到当前浏览的目录</p>
+    <h3 data-i18n="dropTitle">Drag and drop files or folders here</h3>
+    <p data-i18n="dropHint">Files will be uploaded to the current directory</p>
     <div class="upload-btns">
-      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
-      <button class="upload-btn" onclick="document.getElementById('dirInput').click()">选择文件夹</button>
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()" data-i18n="selectFiles">Select Files</button>
+      <button class="upload-btn" onclick="document.getElementById('dirInput').click()" data-i18n="selectFolder">Select Folder</button>
     </div>
     <input type="file" id="fileInput" multiple>
     <input type="file" id="dirInput" webkitdirectory mozdirectory directory multiple>
@@ -356,12 +367,12 @@ function getHTML() {
 
   <div class="file-list">
     <div class="file-list-header">
-      文件列表
-      <span id="fileCount">0 项</span>
+      <span data-i18n="fileList" style="color:#333;font-size:15px;font-weight:600;">File List</span>
+      <span id="fileCount">0 items</span>
     </div>
     <div class="breadcrumb" id="breadcrumb"></div>
     <div id="fileListBody">
-      <div class="empty-msg">暂无文件</div>
+      <div class="empty-msg" data-i18n="empty">No files</div>
     </div>
   </div>
 </div>
@@ -369,13 +380,97 @@ function getHTML() {
 <div class="toast" id="toast"></div>
 
 <script>
+// ==================== i18n ====================
+const I18N = {
+  en: {
+    title: 'LAN File Transfer',
+    subtitle: 'Transfer files and folders between devices on the same network',
+    address: 'Address: ',
+    showQR: 'Show QR Code',
+    hideQR: 'Hide QR Code',
+    dropTitle: 'Drag and drop files or folders here',
+    dropHint: 'Files will be uploaded to the current directory',
+    selectFiles: 'Select Files',
+    selectFolder: 'Select Folder',
+    fileList: 'File List',
+    empty: 'No files',
+    emptyDir: 'This directory is empty',
+    download: 'Download',
+    delete: 'Delete',
+    items: ' items',
+    files: ' files',
+    root: 'Root',
+    uploading: 'Uploading... ',
+    uploadDone: 'Upload complete!',
+    uploadSuccess: 'Upload successful!',
+    uploadFail: 'Upload failed',
+    deleted: 'Deleted',
+    confirmDeleteFile: 'Delete this file?',
+    confirmDeleteDir: 'Delete this folder and all its contents?',
+    folder: 'Folder',
+  },
+  zh: {
+    title: 'LAN File Transfer',
+    subtitle: '在局域网内的设备之间快速传输文件和文件夹',
+    address: '访问地址：',
+    showQR: '显示二维码',
+    hideQR: '隐藏二维码',
+    dropTitle: '拖拽文件或文件夹到此处上传',
+    dropHint: '上传到当前浏览的目录',
+    selectFiles: '选择文件',
+    selectFolder: '选择文件夹',
+    fileList: '文件列表',
+    empty: '暂无文件',
+    emptyDir: '此目录为空',
+    download: '下载',
+    delete: '删除',
+    items: ' 项',
+    files: ' 个文件',
+    root: '根目录',
+    uploading: '上传中... ',
+    uploadDone: '上传完成!',
+    uploadSuccess: '上传成功!',
+    uploadFail: '上传失败',
+    deleted: '已删除',
+    confirmDeleteFile: '确认删除此文件?',
+    confirmDeleteDir: '确认删除此文件夹及其所有内容?',
+    folder: '文件夹',
+  }
+};
+
+let currentLang = (navigator.language || '').startsWith('zh') ? 'zh' : 'en';
+
+function t(key) { return I18N[currentLang][key] || I18N['en'][key] || key; }
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N[currentLang][key] !== undefined) {
+      el.textContent = I18N[currentLang][key];
+    }
+  });
+  // Update lang button active state
+  document.getElementById('langBtnEn').classList.toggle('active', currentLang === 'en');
+  document.getElementById('langBtnZh').classList.toggle('active', currentLang === 'zh');
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('lan-transfer-lang', lang);
+  applyI18n();
+  renderBreadcrumb();
+  loadFiles();
+}
+
+// ==================== Core ====================
 let currentDir = '';
+let qrVisible = false;
 
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
 }
 
 function getIcon(name, isDir) {
@@ -396,7 +491,7 @@ function getIcon(name, isDir) {
 function renderBreadcrumb() {
   const bc = document.getElementById('breadcrumb');
   const parts = currentDir ? currentDir.split('/').filter(Boolean) : [];
-  let html = '<a onclick="navigateTo(\\'\\')">根目录</a>';
+  let html = '<a onclick="navigateTo(\\'\\')">' + t('root') + '</a>';
   let accumulated = '';
   for (let i = 0; i < parts.length; i++) {
     accumulated += (accumulated ? '/' : '') + parts[i];
@@ -423,10 +518,10 @@ async function loadFiles() {
   const data = await res.json();
   const files = data.entries;
   const body = document.getElementById('fileListBody');
-  document.getElementById('fileCount').textContent = files.length + ' 项';
+  document.getElementById('fileCount').textContent = files.length + t('items');
 
   if (files.length === 0) {
-    body.innerHTML = '<div class="empty-msg">此目录为空</div>';
+    body.innerHTML = '<div class="empty-msg">' + (currentDir ? t('emptyDir') : t('empty')) + '</div>';
     return;
   }
 
@@ -444,12 +539,12 @@ async function loadFiles() {
           \${f.name}
         </div>
         <div class="file-meta">
-          \${f.isDir ? f.fileCount + ' 个文件 · ' : ''}\${f.sizeStr} · \${f.timeStr}
+          \${f.isDir ? f.fileCount + t('files') + ' · ' : ''}\${f.sizeStr} · \${f.timeStr}
         </div>
       </div>
       <div class="file-actions">
-        \${f.isDir ? '' : '<button class="btn btn-dl" onclick="downloadItem(\\'' + encodedPath + '\\')">下载</button>'}
-        <button class="btn btn-del" onclick="deleteItem('\${encodedPath}', \${f.isDir})">删除</button>
+        \${f.isDir ? '' : '<button class="btn btn-dl" onclick="downloadItem(\\'' + encodedPath + '\\')">' + t('download') + '</button>'}
+        <button class="btn btn-del" onclick="deleteItem('\${encodedPath}', \${f.isDir})">\${t('delete')}</button>
       </div>
     </div>\`;
   }).join('');
@@ -513,22 +608,22 @@ function uploadFiles(fileEntries) {
     if (e.lengthComputable) {
       const pct = Math.round(e.loaded / e.total * 100);
       progressFill.style.width = pct + '%';
-      progressText.textContent = \`上传中... \${pct}% (\${fileEntries.length} 个文件)\`;
+      progressText.textContent = t('uploading') + pct + '% (' + fileEntries.length + (currentLang === 'zh' ? ' 个文件)' : ' files)');
     }
   };
 
   xhr.onload = () => {
     progressFill.style.width = '100%';
-    progressText.textContent = '上传完成!';
+    progressText.textContent = t('uploadDone');
     setTimeout(() => { progressBar.classList.remove('show'); progressText.classList.remove('show'); }, 1500);
-    showToast('上传成功!');
+    showToast(t('uploadSuccess'));
     loadFiles();
   };
 
   xhr.onerror = () => {
     progressBar.classList.remove('show');
     progressText.classList.remove('show');
-    showToast('上传失败');
+    showToast(t('uploadFail'));
   };
 
   const dirParam = currentDir ? '?dir=' + encodeURIComponent(currentDir) : '';
@@ -541,10 +636,10 @@ function downloadItem(encodedPath) {
 }
 
 async function deleteItem(encodedPath, isDir) {
-  const msg = isDir ? '确认删除此文件夹及其所有内容?' : '确认删除此文件?';
+  const msg = isDir ? t('confirmDeleteDir') : t('confirmDeleteFile');
   if (!confirm(msg)) return;
   await fetch('/api/files/' + encodedPath, { method: 'DELETE' });
-  showToast('已删除');
+  showToast(t('deleted'));
   loadFiles();
 }
 
@@ -572,13 +667,24 @@ document.getElementById('dirInput').addEventListener('change', function() {
   this.value = '';
 });
 
-function toggleQR() { document.getElementById('qrBox').classList.toggle('show'); }
+function toggleQR() {
+  qrVisible = !qrVisible;
+  document.getElementById('qrBox').classList.toggle('show', qrVisible);
+  document.querySelector('[data-i18n="showQR"], [data-i18n="hideQR"]').textContent = qrVisible ? t('hideQR') : t('showQR');
+  document.querySelector('.qr-toggle').setAttribute('data-i18n', qrVisible ? 'hideQR' : 'showQR');
+}
 
 async function init() {
+  // Restore saved language
+  const saved = localStorage.getItem('lan-transfer-lang');
+  if (saved && I18N[saved]) currentLang = saved;
+
   const res = await fetch('/api/qrcode');
   const data = await res.json();
   document.getElementById('serverUrl').textContent = data.url;
   document.getElementById('qrImg').src = data.qr;
+
+  applyI18n();
   renderBreadcrumb();
   loadFiles();
 }
@@ -597,8 +703,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
   console.log(`  Local:   http://localhost:${PORT}`);
   console.log(`  LAN:     http://${ip}:${PORT}`);
-  console.log(`  目录:    ${UPLOAD_DIR}`);
+  console.log(`  Dir:     ${UPLOAD_DIR}`);
   console.log('========================================');
-  console.log('  在同一局域网的其他设备上打开上面的 LAN 地址即可传输文件');
-  console.log('  Ctrl+C 停止服务器\\n');
+  console.log('  Open the LAN address on any device in the same network');
+  console.log('  Ctrl+C to stop\\n');
 });
